@@ -1,0 +1,692 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Record Management System</title>
+
+<!-- Excel Library -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<style>
+
+* {
+    box-sizing: border-box;
+    font-family: Arial, sans-serif;
+}
+
+body {
+    margin: 0;
+    padding: 20px;
+    background: #00dada;
+}
+
+.container {
+    width: 100%;
+    max-width: 1100px;
+    margin: auto;
+}
+
+h2 {
+    text-align: center;
+    color: #003d50;
+    margin-bottom: 25px;
+}
+
+/* INPUT SECTION */
+
+.form-group {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+label {
+    background: #eeeeee;
+    padding: 12px;
+    font-size: 20px;
+    border: 1px solid #aaa;
+}
+
+input, textarea {
+    width: 100%;
+    padding: 12px;
+    font-size: 18px;
+    border: 2px solid #aaa;
+    outline: none;
+    background: white;
+}
+
+textarea {
+    height: 120px;
+    resize: vertical;
+}
+
+input:focus, textarea:focus {
+    border-color: #007bff;
+}
+
+/* BUTTON SECTION */
+
+.buttons {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+    margin-top: 35px;
+}
+
+button {
+    padding: 15px 10px;
+    font-size: 19px;
+    cursor: pointer;
+    border: 2px solid #aaa;
+    border-radius: 4px;
+    background: #eeeeee;
+    transition: 0.2s;
+}
+
+button:hover {
+    background: #d2f5ff;
+    border-color: #007bff;
+}
+
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-add {
+    background: #d4f8d4;
+}
+
+.btn-edit {
+    background: #fff0b3;
+}
+
+.btn-delete {
+    background: #ffcaca;
+}
+
+.btn-export {
+    background: #bdeaff;
+}
+
+/* TABLE SECTION */
+
+.table-container {
+    margin-top: 35px;
+    overflow-x: auto;
+    background: white;
+    border: 2px solid #999;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 500px;
+}
+
+th, td {
+    padding: 13px;
+    text-align: left;
+    border: 1px solid #ccc;
+    font-size: 16px;
+}
+
+th {
+    background: #006b80;
+    color: white;
+}
+
+tbody tr {
+    cursor: pointer;
+}
+
+tbody tr:hover {
+    background: #d9f5ff;
+}
+
+tbody tr.selected {
+    background: #a7e7ff;
+}
+
+.status {
+    margin-top: 20px;
+    padding: 12px;
+    background: #e8ffff;
+    border: 1px solid #009999;
+    color: #004b4b;
+    text-align: center;
+    font-weight: bold;
+}
+
+.record-count {
+    margin-top: 15px;
+    text-align: right;
+    font-weight: bold;
+    color: #003d50;
+}
+
+@media(max-width: 650px) {
+
+    body {
+        padding: 12px;
+    }
+
+    .form-group {
+        grid-template-columns: 1fr;
+        gap: 5px;
+    }
+
+    .buttons {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+
+    button {
+        font-size: 16px;
+    }
+
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <h2>RECORD MANAGEMENT SYSTEM</h2>
+
+    <!-- INPUT FORM -->
+
+    <div class="form-group">
+
+        <label for="txtName">Name</label>
+
+        <input
+            type="text"
+            id="txtName"
+            placeholder="Enter Name"
+            autocomplete="name">
+
+    </div>
+
+    <div class="form-group">
+
+        <label for="txtAddress">Address</label>
+
+        <textarea
+            id="txtAddress"
+            placeholder="Enter Address"></textarea>
+
+    </div>
+
+    <!-- BUTTONS -->
+
+    <div class="buttons">
+
+        <button class="btn-add" onclick="addRecord()">
+            Add
+        </button>
+
+        <button class="btn-edit" onclick="editRecord()"
+                id="btnEdit" disabled>
+            Edit
+        </button>
+
+        <button class="btn-delete" onclick="deleteRecord()"
+                id="btnDelete" disabled>
+            Delete
+        </button>
+
+        <button class="btn-export" onclick="exportExcel()">
+            Export to Excel
+        </button>
+
+    </div>
+
+    <!-- STATUS -->
+
+    <div class="status" id="lblStatus">
+        Ready
+    </div>
+
+    <!-- RECORD COUNT -->
+
+    <div class="record-count" id="lblCount">
+        Total Records: 0
+    </div>
+
+    <!-- RECORD TABLE -->
+
+    <div class="table-container">
+
+        <table>
+
+            <thead>
+                <tr>
+                    <th width="60">No.</th>
+                    <th>Name</th>
+                    <th>Address</th>
+                </tr>
+            </thead>
+
+            <tbody id="recordList">
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+<script>
+
+// ======================================
+// GLOBAL VARIABLES
+// ======================================
+
+const STORAGE_KEY = "MyRecords";
+
+let records = [];
+let selectedID = null;
+
+
+// ======================================
+// LOAD RECORDS
+// ======================================
+
+function loadRecords() {
+
+    try {
+
+        records = JSON.parse(
+            localStorage.getItem(STORAGE_KEY) || "[]"
+        );
+
+        if (!Array.isArray(records)) {
+            records = [];
+        }
+
+    } catch (error) {
+
+        records = [];
+
+    }
+
+    displayRecords();
+
+}
+
+
+// ======================================
+// SAVE RECORDS
+// ======================================
+
+function saveRecords() {
+
+    localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify(records)
+    );
+
+}
+
+
+// ======================================
+// DISPLAY RECORDS
+// ======================================
+
+function displayRecords() {
+
+    const table = document.getElementById("recordList");
+
+    table.replaceChildren();
+
+    records.forEach((record, index) => {
+
+        const row = document.createElement("tr");
+
+        if (record.id === selectedID) {
+            row.classList.add("selected");
+        }
+
+        const no = document.createElement("td");
+        no.textContent = index + 1;
+
+        const name = document.createElement("td");
+        name.textContent = record.name;
+
+        const address = document.createElement("td");
+        address.textContent = record.address;
+
+        row.append(no, name, address);
+
+        // SELECT RECORD
+
+        row.onclick = function() {
+
+            selectRecord(record.id);
+
+        };
+
+        table.appendChild(row);
+
+    });
+
+    document.getElementById("lblCount").textContent =
+        "Total Records: " + records.length;
+
+    updateButtons();
+
+}
+
+
+// ======================================
+// SELECT RECORD
+// ======================================
+
+function selectRecord(id) {
+
+    const record = records.find(r => r.id === id);
+
+    if (!record) return;
+
+    selectedID = id;
+
+    document.getElementById("txtName").value =
+        record.name;
+
+    document.getElementById("txtAddress").value =
+        record.address;
+
+    setStatus("Selected: " + record.name);
+
+    displayRecords();
+
+}
+
+
+// ======================================
+// UPDATE BUTTONS
+// ======================================
+
+function updateButtons() {
+
+    const hasSelection = selectedID !== null;
+
+    document.getElementById("btnEdit").disabled =
+        !hasSelection;
+
+    document.getElementById("btnDelete").disabled =
+        !hasSelection;
+
+}
+
+
+// ======================================
+// CLEAR INPUT FIELDS
+// ======================================
+
+function clearFields() {
+
+    document.getElementById("txtName").value = "";
+
+    document.getElementById("txtAddress").value = "";
+
+    selectedID = null;
+
+    displayRecords();
+
+    document.getElementById("txtName").focus();
+
+}
+
+
+// ======================================
+// STATUS MESSAGE
+// ======================================
+
+function setStatus(message) {
+
+    document.getElementById("lblStatus").textContent =
+        message;
+
+}
+
+
+// ======================================
+// ADD RECORD
+// ======================================
+
+function addRecord() {
+
+    const name = document.getElementById("txtName")
+        .value.trim();
+
+    const address = document.getElementById("txtAddress")
+        .value.trim();
+
+    if (name === "") {
+
+        alert("Please enter Name.");
+
+        document.getElementById("txtName").focus();
+
+        return;
+    }
+
+    if (address === "") {
+
+        alert("Please enter Address.");
+
+        document.getElementById("txtAddress").focus();
+
+        return;
+    }
+
+    // CREATE NEW RECORD
+
+    const newRecord = {
+
+        id: Date.now().toString() +
+            Math.random().toString(36).slice(2),
+
+        name: name,
+
+        address: address
+
+    };
+
+    records.push(newRecord);
+
+    saveRecords();
+
+    clearFields();
+
+    setStatus("Record successfully added!");
+
+}
+
+
+// ======================================
+// EDIT RECORD
+// ======================================
+
+function editRecord() {
+
+    if (selectedID === null) {
+
+        alert("Please select a record to edit.");
+
+        return;
+    }
+
+    const name = document.getElementById("txtName")
+        .value.trim();
+
+    const address = document.getElementById("txtAddress")
+        .value.trim();
+
+    if (name === "") {
+
+        alert("Please enter Name.");
+
+        return;
+    }
+
+    if (address === "") {
+
+        alert("Please enter Address.");
+
+        return;
+    }
+
+    // FIND SELECTED RECORD
+
+    const index = records.findIndex(
+        r => r.id === selectedID
+    );
+
+    if (index === -1) return;
+
+    // UPDATE RECORD
+
+    records[index].name = name;
+
+    records[index].address = address;
+
+    saveRecords();
+
+    clearFields();
+
+    setStatus("Record successfully updated!");
+
+}
+
+
+// ======================================
+// DELETE RECORD
+// ======================================
+
+function deleteRecord() {
+
+    if (selectedID === null) {
+
+        alert("Please select a record to delete.");
+
+        return;
+    }
+
+    const record = records.find(
+        r => r.id === selectedID
+    );
+
+    if (!record) return;
+
+    const answer = confirm(
+        "Are you sure you want to delete:\n\n" +
+        record.name + "?"
+    );
+
+    if (!answer) return;
+
+    // DELETE SELECTED RECORD
+
+    records = records.filter(
+        r => r.id !== selectedID
+    );
+
+    saveRecords();
+
+    clearFields();
+
+    setStatus("Record successfully deleted!");
+
+}
+
+
+// ======================================
+// EXPORT TO EXCEL
+// ======================================
+
+function exportExcel() {
+
+    if (records.length === 0) {
+
+        alert("No records available to export.");
+
+        return;
+    }
+
+    if (typeof XLSX === "undefined") {
+
+        alert("Excel library is unavailable. Check your internet connection.");
+
+        return;
+    }
+
+    // PREPARE EXCEL DATA
+
+    const excelData = records.map((record, index) => ({
+
+        "No.": index + 1,
+
+        "Name": record.name,
+
+        "Address": record.address
+
+    }));
+
+    // CREATE WORKSHEET
+
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+
+    // SET COLUMN WIDTHS
+
+    worksheet["!cols"] = [
+
+        { wch: 8 },
+
+        { wch: 30 },
+
+        { wch: 50 }
+
+    ];
+
+    // CREATE WORKBOOK
+
+    const workbook = XLSX.utils.book_new();
+
+    XLSX.utils.book_append_sheet(
+        workbook,
+        worksheet,
+        "Records"
+    );
+
+    // DOWNLOAD EXCEL FILE
+
+    XLSX.writeFile(
+        workbook,
+        "MyRecords.xlsx"
+    );
+
+    setStatus("Excel file successfully exported!");
+
+}
+
+
+// ======================================
+// INITIALIZE APPLICATION
+// ======================================
+
+loadRecords();
+
+</script>
+
+</body>
+</html>
